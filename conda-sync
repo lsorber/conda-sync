@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# The (default) source and destination parameters.
+dest=${1:-/tmp/conda/linux-64}
+src=${2:-https://repo.continuum.io/pkgs/free/linux-64/}
+
+# Extract packages and md5 checksums.
+index=`curl --silent $src`
+packages=`echo "$index" | sed -En 's/.+href="([^"]*)".+/\1/p'`
+md5s=`echo "$index" | sed -En 's/.+<td>([a-zA-Z0-9]{32})<.+/\1/p'`
+
+# Create file that md5sum can check with `md5sum -c _checksums.md5`.
+mkdir -p $dest
+paste -d " " <(echo "$md5s") <(echo "$packages") > $dest/_checksums.md5 
+
+# Download file if out of date.
+function download {
+    md5remote=$1
+    package=$2
+    # If package exists, but md5 doens't, recompute it.
+    if [ -f $dest/$package ] && [ ! -f $dest/$package.md5 ]; then
+        md5local=($(md5sum $tmp))
+        echo $md5local > $dest/$package.md5
+    fi
+    # If the remote md5 doesn't match the local md5, redownload the package.
+    if [ ! -f $dest/$package.md5 ] || [ "$md5remote" != "`cat $dest/$package.md5`" ]; then
+        echo "Downloading $package into $dest..."
+        tmp=`mktemp $dest/_download.XXXXXXXX`
+        curl --silent $src$package --output $tmp
+        md5local=($(md5sum $tmp))
+        # Should verify md5 here. Unfortunately, remote md5 is not always correct.
+        echo $md5local > $dest/$package.md5
+        mv $tmp $dest/$package
+    else
+        echo "Skipping $package, already up to date."
+    fi
+}
+
+# Loop over all packages and download them.
+while read md5 package
+do
+    download $md5 $package
+done < $dest/_checksums.md5
