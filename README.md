@@ -1,4 +1,4 @@
-# conda-sync.sh
+# conda-sync
 
 Synchronizes a conda package repository such as `https://repo.continuum.io/pkgs/free/linux-64/` with a local directory. Only updates packages whose MD5 checksums don't match with the online repo.
 
